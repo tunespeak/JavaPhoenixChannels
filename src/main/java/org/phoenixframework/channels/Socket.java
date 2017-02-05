@@ -349,7 +349,7 @@ public class Socket {
      * <p>
      * However, although the app has been stopped from crashing, it does not imply the app is functioning as intended. Set the following listener to track the reasons for the issue so that if a fix is found, it can be applied later.
      *
-     * @param listener
+     * @param listener callback to track caught exceptions
      */
     public void setOnSocketThrowExceptionListener(OnSocketThrowExceptionListener listener) {
         onSocketThrowExceptionListener = listener;
