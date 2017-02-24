@@ -93,8 +93,6 @@ public class Socket {
                 }
             } catch (IOException e) {
                 LOG.log(Level.SEVERE, "Failed to read message payload", e);
-            } catch (ConcurrentModificationException e) {
-                LOG.log(Level.SEVERE, "ConcurrentModificationException!", e);
             } catch (Throwable e2) {
                 handleOnSocketException("onMessage", e2);
             } finally {
@@ -356,7 +354,7 @@ public class Socket {
     }
 
     @Override
-    public String toString() {
+    public synchronized String toString() {
         return "PhoenixSocket{" +
                 "endpointUri='" + endpointUri + '\'' +
                 ", channels=" + channels +
@@ -442,8 +440,10 @@ public class Socket {
     }
 
     private void triggerChannelError() {
-        for (final Channel channel : channels) {
-            channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
+        synchronized (channels) {
+            for (final Channel channel : channels) {
+                channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
+            }
         }
     }
 
