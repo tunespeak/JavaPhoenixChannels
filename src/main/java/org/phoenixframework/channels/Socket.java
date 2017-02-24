@@ -354,13 +354,15 @@ public class Socket {
     }
 
     @Override
-    public synchronized String toString() {
-        return "PhoenixSocket{" +
-                "endpointUri='" + endpointUri + '\'' +
-                ", channels=" + channels +
-                ", refNo=" + refNo +
-                ", webSocket=" + webSocket +
-                '}';
+    public String toString() {
+        synchronized (channels) {
+            return "PhoenixSocket{" +
+                    "endpointUri='" + endpointUri + '\'' +
+                    ", channels=" + channels +
+                    ", refNo=" + refNo +
+                    ", webSocket=" + webSocket +
+                    '}';
+        }
     }
 
     synchronized String makeRef() {
