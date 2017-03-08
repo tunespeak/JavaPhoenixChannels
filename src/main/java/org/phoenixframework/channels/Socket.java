@@ -208,11 +208,7 @@ public class Socket {
         LOG.log(Level.FINE, "connect");
         disconnect();
 
-        // No support for ws:// or ws:// in okhttp. See https://github.com/square/okhttp/issues/1652
-        final String httpUrl = this.endpointUri.replaceFirst("^ws:", "http:")
-                .replaceFirst("^wss:", "https:");
-
-        final Request request = new Request.Builder().url(httpUrl).build();
+        final Request request = new Request.Builder().url(this.endpointUri).build();
 
         webSocket = httpClient.newWebSocket(request, wsListener);
     }
