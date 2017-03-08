@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.*;
-import okhttp3.ws.WebSocket;
-import okhttp3.ws.WebSocketCall;
-import okhttp3.ws.WebSocketListener;
-import okio.Buffer;
+import okio.ByteString;
 
 import java.io.IOException;
 import java.util.*;
@@ -19,16 +16,14 @@ import java.util.logging.Logger;
 
 public class Socket {
 
-    public class PhoenixWSListener implements WebSocketListener {
+    public class PhoenixWSListener extends WebSocketListener {
 
         @Override
-        public void onClose(final int code, final String reason) {
+        public void onClosing(WebSocket webSocket, int code, String reason) {
             try {
                 LOG.log(Level.FINE, "WebSocket onClose {0}/{1}", new Object[]{code, reason});
                 cancelReconnectTimer();
                 cancelHeartbeatTimer();
-                Socket.this.webSocket = null;
-
                 for (final ISocketCloseCallback callback : socketCloseCallbacks) {
                     callback.onClose();
                 }
@@ -38,8 +33,14 @@ public class Socket {
         }
 
         @Override
-        public void onFailure(final IOException e, final Response response) {
-            LOG.log(Level.WARNING, "WebSocket connection error", e);
+        public void onClosed(WebSocket webSocket, int code, String reason) {
+            LOG.log(Level.FINE, "WebSocket onClosed {0}/{1}", new Object[]{code, reason});
+            Socket.this.webSocket = null;
+        }
+
+        @Override
+        public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+            LOG.log(Level.WARNING, "WebSocket connection error", t.getMessage());
             try {
                 try {
                     for (final IErrorCallback callback : errorCallbacks) {
@@ -47,7 +48,7 @@ public class Socket {
                         //TODO if there are multiple errorCallbacks do we really want to trigger
                         //the same channel error callbacks multiple times?
                         triggerChannelError();
-                        callback.onError(e.toString());
+                        callback.onError(t.getMessage());
                     }
                 } finally {
                     cancelReconnectTimer();
@@ -57,8 +58,6 @@ public class Socket {
                     if (Socket.this.webSocket != null) {
                         try {
                             Socket.this.webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "EOF received");
-                        } catch (IOException ioe) {
-                            LOG.log(Level.WARNING, "Failed to explicitly close following failure");
                         } finally {
                             Socket.this.webSocket = null;
                         }
@@ -73,31 +72,32 @@ public class Socket {
         }
 
         @Override
-        public void onMessage(final ResponseBody payload) throws IOException {
-            LOG.log(Level.FINE, "Envelope received: {0}", payload);
+        public void onMessage(WebSocket webSocket, ByteString bytes) {
+            super.onMessage(webSocket, bytes.toString());
+        }
+
+        @Override
+        public void onMessage(WebSocket webSocket, String text) {
+            LOG.log(Level.FINE, "Envelope received: {0}", text);
 
             try {
-                if (payload.contentType() == WebSocket.TEXT) {
-                    final Envelope envelope =
-                            objectMapper.readValue(payload.byteStream(), Envelope.class);
-                    synchronized (channels) {
-                        for (final Channel channel : channels) {
-                            if (channel.isMember(envelope.getTopic())) {
-                                channel.trigger(envelope.getEvent(), envelope);
-                            }
+                final Envelope envelope =
+                        objectMapper.readValue(text, Envelope.class);
+                synchronized (channels) {
+                    for (final Channel channel : channels) {
+                        if (channel.isMember(envelope.getTopic())) {
+                            channel.trigger(envelope.getEvent(), envelope);
                         }
                     }
+                }
 
-                    for (final IMessageCallback callback : messageCallbacks) {
-                        callback.onMessage(envelope);
-                    }
+                for (final IMessageCallback callback : messageCallbacks) {
+                    callback.onMessage(envelope);
                 }
             } catch (IOException e) {
                 LOG.log(Level.SEVERE, "Failed to read message payload", e);
             } catch (Throwable e2) {
                 handleOnSocketException("onMessage", e2);
-            } finally {
-                payload.close();
             }
         }
 
@@ -106,8 +106,8 @@ public class Socket {
             try {
                 LOG.log(Level.FINE, "WebSocket onOpen: {0}", webSocket);
                 Socket.this.webSocket = webSocket;
-                cancelReconnectTimer();
 
+                cancelReconnectTimer();
                 startHeartbeatTimer();
 
                 for (final ISocketOpenCallback callback : socketOpenCallbacks) {
@@ -115,15 +115,12 @@ public class Socket {
                 }
 
                 Socket.this.flushSendBuffer();
+
             } catch (Throwable e2) {
                 handleOnSocketException("onOpen", e2);
             }
         }
 
-        @Override
-        public void onPong(final Buffer payload) {
-            LOG.log(Level.INFO, "PONG received: {0}", payload);
-        }
     }
 
     private static final Logger LOG = Logger.getLogger(Socket.class.getName());
@@ -210,12 +207,14 @@ public class Socket {
     public void connect() throws IOException {
         LOG.log(Level.FINE, "connect");
         disconnect();
+
         // No support for ws:// or ws:// in okhttp. See https://github.com/square/okhttp/issues/1652
         final String httpUrl = this.endpointUri.replaceFirst("^ws:", "http:")
                 .replaceFirst("^wss:", "https:");
+
         final Request request = new Request.Builder().url(httpUrl).build();
-        final WebSocketCall wsCall = WebSocketCall.create(httpClient, request);
-        wsCall.enqueue(wsListener);
+
+        webSocket = httpClient.newWebSocket(request, wsListener);
     }
 
     public void disconnect() throws IOException {
@@ -299,14 +298,10 @@ public class Socket {
             final String json = objectMapper.writeValueAsString(node);
             LOG.log(Level.FINE, "Sending JSON: {0}", json);
 
-            RequestBody body = RequestBody.create(WebSocket.TEXT, json);
+            RequestBody body = RequestBody.create(MediaType.parse("text/xml"), json);
 
             if (this.isConnected()) {
-                try {
-                    webSocket.sendMessage(body);
-                } catch (IllegalStateException e) {
-                    LOG.log(Level.SEVERE, "Attempted to send push when socket is not open", e);
-                }
+                webSocket.send(body.toString());
             } else {
                 this.sendBuffer.add(body);
             }
@@ -393,11 +388,7 @@ public class Socket {
     private void flushSendBuffer() {
         while (this.isConnected() && !this.sendBuffer.isEmpty()) {
             final RequestBody body = this.sendBuffer.remove();
-            try {
-                this.webSocket.sendMessage(body);
-            } catch (IOException e) {
-                LOG.log(Level.SEVERE, "Failed to send payload {0}", body);
-            }
+            this.webSocket.send(body.toString());
         }
     }
 
