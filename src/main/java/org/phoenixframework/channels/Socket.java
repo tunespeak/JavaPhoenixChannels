@@ -30,6 +30,7 @@ import okio.ByteString;
 
 public class Socket {
 
+    private static final String DISCONNECTED_BY_CLIENT_REASON = "Disconnected by client";
     private static final Logger log = LoggerFactory.getLogger(Socket.class);
 
     public class PhoenixWSListener extends WebSocketListener {
@@ -84,6 +85,10 @@ public class Socket {
         public void onClosed(WebSocket webSocket, int code, String reason) {
             log.trace("WebSocket onClose {}/{}", code, reason);
             Socket.this.webSocket = null;
+
+            if (!reason.equalsIgnoreCase(DISCONNECTED_BY_CLIENT_REASON)) {
+                scheduleReconnectTimer();
+            }
 
             for (final ISocketCloseCallback callback : socketCloseCallbacks) {
                 callback.onClose();
@@ -200,7 +205,7 @@ public class Socket {
     public void disconnect() throws IOException {
         log.trace("disconnect");
         if (webSocket != null) {
-            webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
+            webSocket.close(1001 /*CLOSE_GOING_AWAY*/, DISCONNECTED_BY_CLIENT_REASON);
         }
         cancelHeartbeatTimer();
         cancelReconnectTimer();
