@@ -137,7 +137,7 @@ public class Channel {
     public Channel off(final String event) {
         synchronized (bindings) {
             for (final Iterator<Binding> bindingIter = bindings.iterator();
-                    bindingIter.hasNext(); ) {
+                 bindingIter.hasNext(); ) {
                 if (bindingIter.next().getEvent().equals(event)) {
                     bindingIter.remove();
                     break;
