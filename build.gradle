@@ -10,8 +10,10 @@ if (project.hasProperty('signing.keyId')) {
     apply plugin: 'signing'
 }
 
+def currentversion = '0.2.12'
 group = 'com.kayako'
-version = '0.2.12'
+version = currentversion
+
 
 allprojects {
     sourceCompatibility = 1.7
@@ -62,16 +64,16 @@ publishing {
     publications {
         JavaPhoenixChannelsJar(MavenPublication) {
             from components.java
-            groupId 'com.kayako'
+            groupId 'com.kayako.kre'
             artifactId 'kre-client'
-            version '0.2'
+            version currentversion
         }
     }
 }
 
 bintray {
-    user = 'ADD_USER_HERE'
-    key = 'ADD_KEY_HERE'
+    user = 'kayako'
+    key = 'ADD_API_HERE'
     pkg {
         repo = 'kayako-devkits'
         name = 'kayako-kre-client'
@@ -79,5 +81,5 @@ bintray {
         licenses = ['BSD-3']
         vcsUrl = 'https://github.com/kayako/kre-java-client'
     }
-    publications = ['KreJavaClientJar']
+    publications = ['JavaPhoenixChannelsJar']
 }
