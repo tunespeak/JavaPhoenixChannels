@@ -8,7 +8,7 @@ This is a fork of the following repo:
 Changes have been made to optimise the behaviour to match my own use cases.
 
 
-# Internal Testing
+## Internal Testing
 
 For production usage, bintray is used to host the jar file generated from this library. But for internal testing, Jitpack.io is used. 
 
