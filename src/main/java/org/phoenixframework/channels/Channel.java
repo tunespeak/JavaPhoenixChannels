@@ -1,11 +1,13 @@
 package org.phoenixframework.channels;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -38,6 +40,8 @@ public class Channel {
     private ChannelState state = ChannelState.CLOSED;
 
     private final String topic;
+
+    private final Presence presence = new Presence();
 
     public Channel(final String topic, final JsonNode payload, final Socket socket) {
         this.topic = topic;
@@ -81,7 +85,40 @@ public class Channel {
             }
         });
 
+        this.on(Presence.Events.STATE, new IMessageCallback() {
+            @Override
+            public void onMessage(Envelope envelope) {
+                presence.sync(envelope);
+            }
+        });
 
+        this.on(Presence.Events.DIFF, new IMessageCallback() {
+            @Override
+            public void onMessage(Envelope envelope) {
+                presence.sync(envelope);
+            }
+        });
+
+        this.presence.setCallback(new IPresenceCallback() {
+            @Override
+            public void onStateChanged(JsonNode state) {
+                Envelope envelope = new Envelope(getTopic(), ChannelEvent.PRESENCE_STATE.getPhxEvent(), state, null);
+                Channel.this.trigger(ChannelEvent.PRESENCE_STATE.getPhxEvent(), envelope);
+
+            }
+
+            @Override
+            public void onJoin(String id, JsonNode meta) {
+                Envelope envelope = new Envelope(getTopic(), ChannelEvent.PRESENCE_JOIN.getPhxEvent(), meta, id);
+                Channel.this.trigger(ChannelEvent.PRESENCE_JOIN.getPhxEvent(), envelope);
+            }
+
+            @Override
+            public void onLeave(String id, JsonNode meta) {
+                Envelope envelope = new Envelope(getTopic(), ChannelEvent.PRESENCE_LEAVE.getPhxEvent(), meta, id);
+                Channel.this.trigger(ChannelEvent.PRESENCE_LEAVE.getPhxEvent(), envelope);
+            }
+        });
     }
 
     /**
