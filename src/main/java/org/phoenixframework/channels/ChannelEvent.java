@@ -5,7 +5,10 @@ public enum ChannelEvent {
     ERROR("phx_error"),
     JOIN("phx_join"),
     REPLY("phx_reply"),
-    LEAVE("phx_leave");
+    LEAVE("phx_leave"),
+    PRESENCE_STATE("p_state"),
+    PRESENCE_JOIN("p_join"),
+    PRESENCE_LEAVE("p_leave");
 
     private final String phxEvent;
 

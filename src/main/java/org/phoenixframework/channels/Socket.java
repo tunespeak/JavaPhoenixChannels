@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.*;
+import sun.net.www.http.HttpClient;
 
 import java.io.IOException;
 import java.util.*;
@@ -125,7 +126,7 @@ public class Socket {
 
     private TimerTask heartbeatTimerTask = null;
 
-    private final OkHttpClient httpClient = new OkHttpClient.Builder()
+    private OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.MINUTES)
             .writeTimeout(5, TimeUnit.MINUTES)
             .readTimeout(5, TimeUnit.MINUTES)
@@ -166,11 +167,20 @@ public class Socket {
         this(endpointUri, DEFAULT_HEARTBEAT_INTERVAL);
     }
 
+    public Socket(final String endpointUri, IMessageCallback messageCallback) throws IOException {
+        this(endpointUri);
+        messageCallbacks.add(messageCallback);
+    }
+
     public Socket(final String endpointUri, final int heartbeatIntervalInMs) {
         LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
         this.endpointUri = endpointUri;
         this.heartbeatInterval = heartbeatIntervalInMs;
         this.timer = new Timer("Reconnect Timer for " + endpointUri);
+    }
+
+    public void setHttpClient(OkHttpClient client) {
+        this.httpClient = client;
     }
 
     /**
