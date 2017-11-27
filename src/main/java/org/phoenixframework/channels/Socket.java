@@ -167,6 +167,11 @@ public class Socket {
         this(endpointUri, DEFAULT_HEARTBEAT_INTERVAL);
     }
 
+    public Socket(final String endpointUri, IMessageCallback messageCallback) throws IOException {
+        this(endpointUri);
+        messageCallbacks.add(messageCallback);
+    }
+
     public Socket(final String endpointUri, final int heartbeatIntervalInMs) {
         LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
         this.endpointUri = endpointUri;
