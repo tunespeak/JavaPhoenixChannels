@@ -275,6 +275,10 @@ public class Channel {
         this.channelTimer.schedule(timerTask, ms);
     }
 
+    public Presence getPresence() {
+        return presence;
+    }
+
     @Override
     public String toString() {
         return "Channel{" +
